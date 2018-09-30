@@ -135,91 +135,42 @@ local function piston_orientate(pos, placer)
 	minetest.after(0, mesecon.on_placenode, pos, node)
 end
 
-local rotations = {
-	{0, 16, 20, 12},
-	{2, 14, 22, 18},
-	{1,  5, 23,  9},
-	{3, 11, 21,  7},
-	{4, 13, 10, 19},
-	{6, 15,  8, 17},
-}
-
-local function get_rotation(param2)
-	for a = 1, #rotations do
-		for f = 1, #rotations[a] do
-			if rotations[a][f] == param2 then
-				return a, f
-			end
-		end
-	end
-end
-
-local function rotate(param2, mode)
-	local axis, face = get_rotation(param2)
-	if mode == screwdriver.ROTATE_FACE then
-		face = face + 1
-		if face > 4 then
-			face = 1
-		end
-	elseif mode == screwdriver.ROTATE_AXIS then
-		axis = axis + 1
-		if axis > 6 then
-			axis = 1
-		end
-		face = 1
-	else
-		return param2
-	end
-	return rotations[axis][face]
-end
-
-local function piston_rotate(pos, node, _, mode)
-	node.param2 = rotate(node.param2, mode)
+local function piston_rotate(pos, node, _, _, new_param2)
+	node.param2 = new_param2
 	minetest.swap_node(pos, node)
 	mesecon.execute_autoconnect_hooks_now(pos, node)
 	return true
 end
 
-local function piston_rotate_on(pos, node, player, mode)
+local function piston_rotate_on(pos, node, player, _, new_param2)
 	local pistonspec = get_pistonspec(node.name, "onname")
 	local dir = vector.multiply(minetest.facedir_to_dir(node.param2), -1)
 	local pusher_pos = vector.add(dir, pos)
 	local pusher_node = minetest.get_node(pusher_pos)
 	if pusher_node.name ~= pistonspec.pusher then
-		return piston_rotate(pos, node, nil, mode)
-	end
-	if mode == screwdriver.ROTATE_FACE then
-		piston_rotate(pusher_pos, pusher_node, nil, mode)
-		return piston_rotate(pos, node, nil, mode)
-	elseif mode ~= screwdriver.ROTATE_AXIS then
-		return false
+		return piston_rotate(pos, node, nil, _, new_param2)
 	end
 	local player_name = player and player:is_player() and player:get_player_name() or ""
 	local ok, dir_after, pusher_pos_after
-	for i = 1, 5 do
-		node.param2 = rotate(node.param2, mode)
-		dir_after = vector.multiply(minetest.facedir_to_dir(node.param2), -1)
-		pusher_pos_after = vector.add(dir_after, pos)
-		local pusher_pos_after_node_name = minetest.get_node(pusher_pos_after).name
-		local pusher_pos_after_node_def = minetest.registered_nodes[pusher_pos_after_node_name]
-		if pusher_pos_after_node_def and pusher_pos_after_node_def.buildable_to and
-				not minetest.is_protected(pusher_pos_after, player_name) then
-			ok = true
-			break
-		end
+	
+	node.param2 = new_param2
+	dir_after = vector.multiply(minetest.facedir_to_dir(node.param2), -1)
+	pusher_pos_after = vector.add(dir_after, pos)
+	local pusher_pos_after_node_name = minetest.get_node(pusher_pos_after).name
+	local pusher_pos_after_node_def = minetest.registered_nodes[pusher_pos_after_node_name]
+	if pusher_pos_after_node_def and pusher_pos_after_node_def.buildable_to and
+			not minetest.is_protected(pusher_pos_after, player_name) then
+		pusher_node.param2 = node.param2
+		minetest.remove_node(pusher_pos)
+		minetest.set_node(pusher_pos_after, pusher_node)
+		minetest.swap_node(pos, node)
+		mesecon.execute_autoconnect_hooks_now(pos, node)
+		return true
 	end
-	if not ok then
-		return false
-	end
-	pusher_node.param2 = node.param2
-	minetest.remove_node(pusher_pos)
-	minetest.set_node(pusher_pos_after, pusher_node)
-	minetest.swap_node(pos, node)
-	mesecon.execute_autoconnect_hooks_now(pos, node)
-	return true
+	return false
 end
 
-local function piston_rotate_pusher(pos, node, player, mode)
+local function piston_rotate_pusher(pos, node, player, _, new_param2)
 	local pistonspec = get_pistonspec(node.name, "pusher")
 	local piston_pos = vector.add(pos, minetest.facedir_to_dir(node.param2))
 	local piston_node = minetest.get_node(piston_pos)
@@ -227,7 +178,7 @@ local function piston_rotate_pusher(pos, node, player, mode)
 		minetest.remove_node(pos) -- Make it possible to remove alone pushers.
 		return false
 	end
-	return piston_rotate_on(piston_pos, piston_node, player, mode)
+	return piston_rotate_on(piston_pos, piston_node, player, _, new_param2)
 end
 
 
