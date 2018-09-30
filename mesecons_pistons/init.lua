@@ -158,8 +158,11 @@ local function piston_rotate_on(pos, node, player, _, new_param2)
 	pusher_pos_after = vector.add(dir_after, pos)
 	local pusher_pos_after_node_name = minetest.get_node(pusher_pos_after).name
 	local pusher_pos_after_node_def = minetest.registered_nodes[pusher_pos_after_node_name]
-	if pusher_pos_after_node_def and pusher_pos_after_node_def.buildable_to and
-			not minetest.is_protected(pusher_pos_after, player_name) then
+	if
+		(vector.equals(pusher_pos, pusher_pos_after) or
+		(pusher_pos_after_node_def and pusher_pos_after_node_def.buildable_to)) and
+		not minetest.is_protected(pusher_pos_after, player_name)
+	then
 		pusher_node.param2 = node.param2
 		minetest.remove_node(pusher_pos)
 		minetest.set_node(pusher_pos_after, pusher_node)
